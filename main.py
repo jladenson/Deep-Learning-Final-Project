@@ -140,6 +140,9 @@ def main():
     # data = TextToList('data/___.fa')
     data = RemoveNonAGCT(data)
 
+    '''This script applys the trained Deep Splice models
+        giving a DNA sequnce with length 602 and Splice
+        site in 300-301 positions :...300N...SS... 300N... '''
     begin = 0
     end = 602
     sig_str = 300
