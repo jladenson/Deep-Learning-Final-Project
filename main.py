@@ -33,7 +33,7 @@ def split_up_down(dna_list, sig_str, sig_end, begin, end):
     return up, down
 
 def EncodeSeqToMono_4D(dna_list):
-    ''' Encode a list of DNA sequences to a list of 4xL "images" '''
+    ''' Encode a list of DNA sequences to a list of 4xLx1 "images" '''
     seq = dna_list[0]
     n = len(seq)
     bases = 'ACGT'
@@ -49,7 +49,7 @@ def EncodeSeqToMono_4D(dna_list):
     return tf.expand_dims(tf.constant(data), axis=3)
 
 def EncodeSeqToTri_64D(dna_list):
-    ''' Encode a list of DNA sequences to a list of 64xL "images" '''
+    ''' Encode a list of DNA sequences to a list of 64xLx1 "images" '''
     seq = dna_list[0]
     n = len(seq)
     tris = list(map(''.join, product('ACGT', repeat=3)))
@@ -79,19 +79,15 @@ def RemoveNonAGCT(dna_list):
 ############################################################################################################
 
 def train_trinucleotide_model(data_64d, labels):
-    conv = Conv(embedding_dim=64, filter_len=4)
-    conv.compile(optimizer='nadam',
-                 loss=losses.BinaryCrossentropy(from_logits=True),
-                 metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    conv = Conv(embedding_dim=64, filter_lens=[3, 5, 10, 21, 31, 41, 50, 61])
+    conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_64d, labels)
     preds = conv.predict(data_64d)
     return preds
 
 def train_single_nucleotide_model(data_4d, labels):
-    conv = Conv(embedding_dim=4, filter_len=4)
-    conv.compile(optimizer='nadam',
-                 loss=losses.BinaryCrossentropy(from_logits=True),
-                 metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    conv = Conv(embedding_dim=4, filter_lens=range(1, 10))
+    conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_4d, labels)
     preds = conv.predict(data_4d)
     return preds
@@ -118,9 +114,7 @@ def train_donor_models(data, data_up, data_down, labels):
                                down_predictions),
                                axis=1)
     mlp = MLP()
-    mlp.compile(optimizer='adam',
-                loss=losses.BinaryCrossentropy(from_logits=True),
-                metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    mlp.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     mlp.fit(combined_data, labels)
     # preds = mlp.predict(combined_data)
     loss, acc = mlp.evaluate(combined_data, labels)
@@ -148,9 +142,7 @@ def train_acceptor_models(data, data_up, data_down, labels):
                                down_predictions),
                                axis=1)
     mlp = MLP()
-    mlp.compile(optimizer='adam',
-                loss=losses.BinaryCrossentropy(from_logits=True),
-                metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    mlp.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     mlp.fit(combined_data, labels)
     # preds = mlp.predict(combined_data)
     loss, acc = mlp.evaluate(combined_data, labels)
@@ -178,7 +170,7 @@ def main():
     data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
 
     # generate random labels for now
-    labels = tf.constant([rng.choice([[1., 0.], [0., 1.]]) for _ in data])
+    labels = tf.constant([rng.choice([[0, 1], [1, 0]]) for _ in data])
 
     # Train the donor models
     don_acc = train_donor_models(data, data_up, data_down, labels)
