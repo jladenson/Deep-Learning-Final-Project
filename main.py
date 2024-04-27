@@ -1,11 +1,14 @@
 import tensorflow as tf
-import keras
-from keras import layers
+from keras import losses, metrics
 import numpy as np
 from itertools import product
 import matplotlib.pyplot as plt
 from models import Conv, MLP
+rng = np.random.default_rng()
 
+############################################################################################################
+# preprocessing                                                                                            #
+############################################################################################################
 
 def TextToList(fileName):
     ''' Read fasta file and return its sequences as a list '''
@@ -20,12 +23,12 @@ def TextToList(fileName):
 
 def split_up_down(dna_list, sig_str, sig_end, begin, end):
     ''' Split regions around SS to Up stream and Down stream '''
+    ''' TODO: is this exclding data?? '''
     down=[]
     up=[]
-    #short_dna=[]
-    for s in range(len(dna_list)):
-        up.append(dna_list[s][begin:sig_str])
-        down.append(dna_list[s][sig_end:end])
+    for s in dna_list:
+        up.append(s[begin:sig_str])
+        down.append(s[sig_end:end])
 
     return up, down
 
@@ -43,7 +46,7 @@ def EncodeSeqToMono_4D(dna_list):
 
         data.append(image)
 
-    return data
+    return tf.expand_dims(tf.constant(data), axis=3)
 
 def EncodeSeqToTri_64D(dna_list):
     ''' Encode a list of DNA sequences to a list of 64xL "images" '''
@@ -60,7 +63,7 @@ def EncodeSeqToTri_64D(dna_list):
 
         data.append(image)
 
-    return data
+    return tf.expand_dims(tf.constant(data), axis=3)
 
 def RemoveNonAGCT(dna_list):
     ''' Remove sequences that contain characters other than ACGT '''
@@ -71,20 +74,29 @@ def RemoveNonAGCT(dna_list):
 
     return dna_listACGT
 
+############################################################################################################
+# training models                                                                                          #
+############################################################################################################
 
 def train_trinucleotide_model(data_64d, labels):
     conv = Conv(embedding_dim=64, filter_len=4)
+    conv.compile(optimizer='nadam',
+                 loss=losses.BinaryCrossentropy(from_logits=True),
+                 metrics=[metrics.BinaryCrossentropy(from_logits=True)])
     conv.fit(data_64d, labels)
     preds = conv.predict(data_64d)
     return preds
 
 def train_single_nucleotide_model(data_4d, labels):
     conv = Conv(embedding_dim=4, filter_len=4)
+    conv.compile(optimizer='nadam',
+                 loss=losses.BinaryCrossentropy(from_logits=True),
+                 metrics=[metrics.BinaryCrossentropy(from_logits=True)])
     conv.fit(data_4d, labels)
     preds = conv.predict(data_4d)
     return preds
 
-def train_donor_models(data, data_up, data_down):
+def train_donor_models(data, data_up, data_down, labels):
     ''' upstream: trinucleuotide
     downstream: single nucleuotide '''
     data_surrounding_4d = EncodeSeqToMono_4D(data)
@@ -92,24 +104,29 @@ def train_donor_models(data, data_up, data_down):
     data_down_4d = EncodeSeqToMono_4D(data_down)
 
     # surrounding
-    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d)
+    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d, labels)
 
     # upstream
-    up_predictions = train_trinucleotide_model(data_up_64d)
+    up_predictions = train_trinucleotide_model(data_up_64d, labels)
 
     # downstream
-    down_predictions = train_single_nucleotide_model(data_down_4d)
+    down_predictions = train_single_nucleotide_model(data_down_4d, labels)
 
     # input (surrounding + upstream + downstream) to mlp
+    combined_data = tf.concat((surrounding_predictions,
+                               up_predictions,
+                               down_predictions),
+                               axis=1)
     mlp = MLP()
-    combined_data = np.concatenate((surrounding_predictions,
-                                    up_predictions,
-                                    down_predictions),
-                                    axis=1)
+    mlp.compile(optimizer='adam',
+                loss=losses.BinaryCrossentropy(from_logits=True),
+                metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    mlp.fit(combined_data, labels)
+    # preds = mlp.predict(combined_data)
+    loss, acc = mlp.evaluate(combined_data, labels)
+    return acc
 
-    return mlp(combined_data)
-
-def train_acceptor_models(data, data_up, data_down):
+def train_acceptor_models(data, data_up, data_down, labels):
     ''' upstream: single nucleuotide
         downstream: trinucleuotide '''
     data_surrounding_4d = EncodeSeqToMono_4D(data)
@@ -117,43 +134,58 @@ def train_acceptor_models(data, data_up, data_down):
     data_down_64d = EncodeSeqToTri_64D(data_down)
 
     # surrounding
-    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d)
+    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d, labels)
 
     # upstream
-    up_predictions = train_single_nucleotide_model(data_up_4d)
+    up_predictions = train_single_nucleotide_model(data_up_4d, labels)
 
     # downstream
-    down_predictions = train_trinucleotide_model(data_down_64d)
+    down_predictions = train_trinucleotide_model(data_down_64d, labels)
 
     # input (surrounding + upstream + downstream) to mlp
+    combined_data = tf.concat((surrounding_predictions,
+                               up_predictions,
+                               down_predictions),
+                               axis=1)
     mlp = MLP()
-    combined_data = np.concatenate((surrounding_predictions,
-                                    up_predictions,
-                                    down_predictions),
-                                    axis=1)
+    mlp.compile(optimizer='adam',
+                loss=losses.BinaryCrossentropy(from_logits=True),
+                metrics=[metrics.BinaryCrossentropy(from_logits=True)])
+    mlp.fit(combined_data, labels)
+    # preds = mlp.predict(combined_data)
+    loss, acc = mlp.evaluate(combined_data, labels)
+    return acc
 
-    return mlp(combined_data)
+############################################################################################################
+# main                                                                                                     #
+############################################################################################################
 
 def main():
+    ''' This script trains the Deep Splice models
+        given a DNA sequnce with length 602 and Splice
+        site in 300-301 positions :...300N...SS... 300N... '''
 
-    data = [['A', 'C', 'G', 'T'], ['A', 'F']]
+    # generate random data for now
+    data = rng.choice(['A', 'C', 'G', 'T'], (20, 602))
+
     # data = TextToList('data/___.fa')
     data = RemoveNonAGCT(data)
 
-    '''This script applys the trained Deep Splice models
-        giving a DNA sequnce with length 602 and Splice
-        site in 300-301 positions :...300N...SS... 300N... '''
     begin = 0
     end = 602
     sig_str = 300
     sig_end = 302
     data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
 
+    # generate random labels for now
+    labels = tf.constant([rng.choice([[1., 0.], [0., 1.]]) for _ in data])
+
     # Train the donor models
-    train_donor_models(data, data_up, data_down)
+    don_acc = train_donor_models(data, data_up, data_down, labels)
+    print(don_acc)
 
     # Train the acceptor models
-    train_acceptor_models(data, data_up, data_down)
+    # acc_acc = train_acceptor_models(data, data_up, data_down, labels)
 
     # TODO: probably want to save models to file and collect metrics
 
