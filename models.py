@@ -3,26 +3,6 @@ import keras
 from keras.layers import (Conv2D, Dropout, Concatenate,
                           Flatten, Dense, MaxPool2D)
 
-'''
-class Conv(keras.Model):
-    def __init__(self, embedding_dim=4, filter_len=4):
-        super(Conv, self).__init__()
-        self.conv = keras.Sequential([
-            Conv2D(filters=32,
-                          kernel_size=(embedding_dim, filter_len),
-                          strides=1,
-                          activation='relu'),
-            MaxPool2D(pool_size=(1, 4)),
-            Dropout(0.3),
-            Flatten(),
-            Dense(500),
-            Dense(2, activation='softmax')
-        ])
-
-    def call(self, x):
-        return self.conv(x)
-'''
-
 class Conv(tf.keras.Model):
     def __init__(self, embedding_dim=4, filter_lens=[4] * 8):
         super(Conv, self).__init__()
@@ -51,7 +31,7 @@ class Conv(tf.keras.Model):
         # Forward pass
         conv_pool_outputs = []
         for layers in self.conv_pool_layers:
-            outputs = tf.identity(inputs) # copy inputs
+            outputs = inputs # copy inputs
             for layer in layers: # does conv, pool, dropout
                 outputs = layer(outputs)
             conv_pool_outputs.append(outputs)

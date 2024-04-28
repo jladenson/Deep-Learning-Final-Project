@@ -1,9 +1,10 @@
 import tensorflow as tf
-from keras import losses, metrics
+from keras.models import load_model
 import numpy as np
 from itertools import product
 import matplotlib.pyplot as plt
 from models import Conv, MLP
+import argparse
 rng = np.random.default_rng()
 
 ############################################################################################################
@@ -75,92 +76,170 @@ def RemoveNonAGCT(dna_list):
     return dna_listACGT
 
 ############################################################################################################
+# loading models                                                                                           #
+############################################################################################################
+
+def load_donor_models(data, data_up, data_down, labels):
+    path = 'models/donor/donor_'
+    models = ['srdng', 'up', 'down', 'final']
+    if (not all(tf.io.gfile.exists(path + model + '.keras') for model in models)):
+        return -1
+    srdng_model = load_model(path + 'srdng.keras')
+    up_model = load_model(path + 'up.keras')
+    down_model = load_model(path + 'down.keras')
+    final_model = load_model(path + 'final.keras')
+
+    data_srdng_4d = EncodeSeqToMono_4D(data)
+    data_up_64d = EncodeSeqToTri_64D(data_up)
+    data_down_4d = EncodeSeqToMono_4D(data_down)
+
+    srdng_preds = srdng_model.predict(data_srdng_4d)
+    up_preds = up_model.predict(data_up_64d)
+    down_preds = down_model.predict(data_down_4d)
+
+    combined_data = tf.concat((srdng_preds,
+                               up_preds,
+                               down_preds),
+                               axis=1)
+
+    loss, acc = final_model.evaluate(combined_data, labels)
+    return acc
+
+def load_acceptor_models(data, data_up, data_down, labels):
+    path = 'models/acceptor/acceptor_'
+    models = ['srdng', 'up', 'down', 'final']
+    if (not all(tf.io.gfile.exists(path + model + '.keras') for model in models)):
+        return -1
+
+    srdng_model = load_model(path + 'srdng.keras')
+    up_model = load_model(path + 'up.keras')
+    down_model = load_model(path + 'down.keras')
+    final_model = load_model(path + 'final.keras')
+
+    data_srdng_4d = EncodeSeqToMono_4D(data)
+    data_up_4d = EncodeSeqToMono_4D(data_up)
+    data_down_64d = EncodeSeqToTri_64D(data_down)
+
+    srdng_preds = srdng_model.predict(data_srdng_4d)
+    up_preds = up_model.predict(data_up_4d)
+    down_preds = down_model.predict(data_down_64d)
+
+    combined_data = tf.concat((srdng_preds,
+                            up_preds,
+                            down_preds),
+                            axis=1)
+
+    loss, acc = final_model.evaluate(combined_data, labels)
+    return acc
+
+############################################################################################################
 # training models                                                                                          #
 ############################################################################################################
 
 def train_trinucleotide_model(data_64d, labels):
     conv = Conv(embedding_dim=64, filter_lens=[3, 5, 10, 21, 31, 41, 50, 61])
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
-    conv.fit(data_64d, labels)
-    preds = conv.predict(data_64d)
-    return preds
+    conv.fit(data_64d,
+             labels,
+             epochs=1,
+             batch_size=64)
+    return conv
 
 def train_single_nucleotide_model(data_4d, labels):
-    conv = Conv(embedding_dim=4, filter_lens=range(1, 10))
+    conv = Conv(embedding_dim=4, filter_lens=list(range(1, 10)))
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
-    conv.fit(data_4d, labels)
-    preds = conv.predict(data_4d)
-    return preds
+    conv.fit(data_4d,
+             labels,
+             epochs=1,
+             batch_size=64)
+    return conv
 
 def train_donor_models(data, data_up, data_down, labels):
     ''' upstream: trinucleuotide
     downstream: single nucleuotide '''
-    data_surrounding_4d = EncodeSeqToMono_4D(data)
+    data_srdng_4d = EncodeSeqToMono_4D(data)
     data_up_64d = EncodeSeqToTri_64D(data_up)
     data_down_4d = EncodeSeqToMono_4D(data_down)
 
     # surrounding
-    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d, labels)
+    srdng_model = train_single_nucleotide_model(data_srdng_4d, labels)
+    srdng_model.save('models/donor/donor_srdng.keras')
+    srdng_preds = srdng_model.predict(data_srdng_4d)
 
     # upstream
-    up_predictions = train_trinucleotide_model(data_up_64d, labels)
+    up_model = train_trinucleotide_model(data_up_64d, labels)
+    up_model.save('models/donor/donor_up.keras')
+    up_preds = up_model.predict(data_up_64d)
 
     # downstream
-    down_predictions = train_single_nucleotide_model(data_down_4d, labels)
+    down_model = train_single_nucleotide_model(data_down_4d, labels)
+    down_model.save('models/donor/donor_down.keras')
+    down_preds = down_model.predict(data_down_4d)
 
     # input (surrounding + upstream + downstream) to mlp
-    combined_data = tf.concat((surrounding_predictions,
-                               up_predictions,
-                               down_predictions),
+    combined_data = tf.concat((srdng_preds,
+                               up_preds,
+                               down_preds),
                                axis=1)
-    mlp = MLP()
-    mlp.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    mlp.fit(combined_data, labels)
-    # preds = mlp.predict(combined_data)
-    loss, acc = mlp.evaluate(combined_data, labels)
+    final_model = MLP()
+    final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    final_model.fit(combined_data, labels)
+    final_model.save('models/donor/donor_final.keras')
+    loss, acc = final_model.evaluate(combined_data, labels)
     return acc
 
 def train_acceptor_models(data, data_up, data_down, labels):
     ''' upstream: single nucleuotide
         downstream: trinucleuotide '''
-    data_surrounding_4d = EncodeSeqToMono_4D(data)
+    data_srdng_4d = EncodeSeqToMono_4D(data)
     data_up_4d = EncodeSeqToMono_4D(data_up)
     data_down_64d = EncodeSeqToTri_64D(data_down)
 
     # surrounding
-    surrounding_predictions = train_single_nucleotide_model(data_surrounding_4d, labels)
+    srdng_model = train_single_nucleotide_model(data_srdng_4d, labels)
+    srdng_model.save('models/acceptor/acceptor_srdng.keras')
+    srdng_preds = srdng_model.predict(data_srdng_4d)
 
     # upstream
-    up_predictions = train_single_nucleotide_model(data_up_4d, labels)
+    up_model = train_single_nucleotide_model(data_up_4d, labels)
+    up_model.save('models/acceptor/acceptor_up.keras')
+    up_preds = up_model.predict(data_up_4d)
 
     # downstream
-    down_predictions = train_trinucleotide_model(data_down_64d, labels)
+    down_model = train_trinucleotide_model(data_down_64d, labels)
+    down_model.save('models/acceptor/acceptor_down.keras')
+    down_preds = down_model.predict(data_down_64d)
 
     # input (surrounding + upstream + downstream) to mlp
-    combined_data = tf.concat((surrounding_predictions,
-                               up_predictions,
-                               down_predictions),
+    combined_data = tf.concat((srdng_preds,
+                               up_preds,
+                               down_preds),
                                axis=1)
-    mlp = MLP()
-    mlp.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    mlp.fit(combined_data, labels)
-    # preds = mlp.predict(combined_data)
-    loss, acc = mlp.evaluate(combined_data, labels)
+    final_model = MLP()
+    final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    final_model.fit(combined_data,
+            labels,
+            epochs=1,)
+    final_model.save('models/acceptor/acceptor_final.keras')
+    loss, acc = final_model.evaluate(combined_data, labels)
     return acc
 
 ############################################################################################################
 # main                                                                                                     #
 ############################################################################################################
 
-def main():
+def main(train_donor=False, train_acceptor=False):
     ''' This script trains the Deep Splice models
         given a DNA sequnce with length 602 and Splice
         site in 300-301 positions :...300N...SS... 300N... '''
 
+    if train_donor and train_acceptor:
+        raise ValueError('Cannot train both donor and acceptor models simultaneously')
+
     # generate random data for now
     data = rng.choice(['A', 'C', 'G', 'T'], (20, 602))
-
     # data = TextToList('data/___.fa')
+
     data = RemoveNonAGCT(data)
 
     begin = 0
@@ -173,15 +252,24 @@ def main():
     labels = tf.constant([rng.choice([[0, 1], [1, 0]]) for _ in data])
 
     # Train the donor models
-    don_acc = train_donor_models(data, data_up, data_down, labels)
-    print(don_acc)
+    if train_donor:
+        don_acc = train_donor_models(data, data_up, data_down, labels)
+    else:
+        don_acc = load_donor_models(data, data_up, data_down, labels)
+    print(f'donor accuracy: {don_acc}')
 
     # Train the acceptor models
-    # acc_acc = train_acceptor_models(data, data_up, data_down, labels)
-
-    # TODO: probably want to save models to file and collect metrics
+    if train_acceptor:
+        acc_acc = train_acceptor_models(data, data_up, data_down, labels)
+    else:
+        acc_acc = load_acceptor_models(data, data_up, data_down, labels)
+    print(f'acceptor accuracy: {acc_acc}')
 
     return
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_donor", action="store_true", help="Train donor models")
+    parser.add_argument("--train_acceptor", action="store_true", help="Train acceptor models")
+    args = parser.parse_args()
+    main(args.train_donor, args.train_acceptor)

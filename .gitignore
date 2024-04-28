@@ -35,3 +35,6 @@ Thumbs.db
 # Ignore dependency management files
 pip-lock.txt
 pipenv.lock
+
+# ignore model files
+models/
