@@ -141,7 +141,7 @@ def train_trinucleotide_model(data_64d, labels):
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_64d,
              labels,
-             epochs=1,
+             epochs=10,
              batch_size=64)
     return conv
 
@@ -150,7 +150,7 @@ def train_single_nucleotide_model(data_4d, labels):
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_4d,
              labels,
-             epochs=1,
+             epochs=10,
              batch_size=64)
     return conv
 
@@ -183,7 +183,10 @@ def train_donor_models(data, data_up, data_down, labels):
                                axis=1)
     final_model = MLP()
     final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    final_model.fit(combined_data, labels)
+    final_model.fit(combined_data,
+                    labels,
+                    epochs=10,
+                    batch_size=64)
     final_model.save('models/donor/donor_final.keras')
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
@@ -218,8 +221,9 @@ def train_acceptor_models(data, data_up, data_down, labels):
     final_model = MLP()
     final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     final_model.fit(combined_data,
-            labels,
-            epochs=1,)
+                    labels,
+                    epochs=10,
+                    batch_size=64)
     final_model.save('models/acceptor/acceptor_final.keras')
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
@@ -237,7 +241,7 @@ def main(train_donor=False, train_acceptor=False):
         raise ValueError('Cannot train both donor and acceptor models simultaneously')
 
     # generate random data for now
-    data = rng.choice(['A', 'C', 'G', 'T'], (20, 602))
+    data = rng.choice(['A', 'C', 'G', 'T'], (100, 602))
     # data = TextToList('data/___.fa')
 
     data = RemoveNonAGCT(data)
