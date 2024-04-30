@@ -42,14 +42,13 @@ def parseGTF(gtfFile: str):
         fields = line.strip().split("\t")
         attributes = {}
         for attribute in fields[8].split(";"):
-            if attribute.strip():  # Check if attribute is not empty
+            if attribute.strip():
                 try:
-                    key, value = attribute.strip().split(" ", 1)  # Split only once
+                    key, value = attribute.strip().split(" ", 1)  
                     attributes[key] = value.strip('"')
                 except ValueError:
-                    # Handle cases where there is no space to split
                     key = attribute.strip()
-                    attributes[key] = None  # Set value to None or handle it accordingly
+                    attributes[key] = None  
         yield {
             "seqname": fields[0],
             "source": fields[1],
