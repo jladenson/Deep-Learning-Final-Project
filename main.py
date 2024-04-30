@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from models import Conv, MLP
 import argparse
 import pandas as pd
+import preprocess
 rng = np.random.default_rng()
 
 ############################################################################################################
@@ -22,54 +23,6 @@ def TextToList(fileName):
                 dna_list.append(line.rstrip("\n"))
     file.close()
     return dna_list
-
-
-def gtf_to_dataframe(gtf_file: str):
-    '''Returns a pandas dataframe of the original GTF file'''
-    gtf_data = []
-    with open(gtf_file) as file:
-        for record in parseGTF(file):
-            gtf_data.append(record)
-
-    df = pd.DataFrame(gtf_data)
-    return df
-
-def parseGTF(gtfFile: str):
-    '''Helper for gtf_to_dataframe which reads GTF file and organises it into fields.'''
-    for line in gtfFile:
-        if line.startswith("#"):
-            continue
-        fields = line.strip().split("\t")
-        attributes = {}
-        for attribute in fields[8].split(";"):
-            if attribute.strip():
-                try:
-                    key, value = attribute.strip().split(" ", 1)  
-                    attributes[key] = value.strip('"')
-                except ValueError:
-                    key = attribute.strip()
-                    attributes[key] = None  
-        yield {
-            "seqname": fields[0],
-            "source": fields[1],
-            "feature": fields[2],
-            "start": int(fields[3]),
-            "end": int(fields[4]),
-            "score": fields[5],
-            "strand": fields[6],
-            "frame": fields[7],
-            **attributes
-        }
-
-def get_SS_data(df: pd.DataFrame): 
-    '''Takes in a pandas dataFrame of the GTF file and returns a sorted list of the start and stop indices
-    (in the FASTA file) for exons'''
-    exon_df = df[df['feature'] == 'exon']
-    start_df = exon_df['start']
-    end_df = exon_df['end']
-    ss_df = pd.concat([start_df, end_df], axis=1)
-    ss_df = ss_df.sort_values(by=['start'], ascending=True)
-    return ss_df 
 
 def split_up_down(dna_list, sig_str, sig_end, begin, end):
     ''' Split regions around SS to Up stream and Down stream '''
