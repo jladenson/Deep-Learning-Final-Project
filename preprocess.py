@@ -59,11 +59,11 @@ def readFASTA_by_chromosome(fastaFile: str):
   with open(fastaFile) as file:
     #Iterate through each 'record' (representing a chromosome) and turn into a string
     for chromosome in SeqIO.parse(file, 'fasta'):
-      seq = str(chromosome.seq)
-      genome.append([seq])
+      seq = list(str(chromosome.seq).upper()) #potential error
+      genome.append(seq)
 
   return genome
-
+"""
 def readFASTA_by_genome(fastaFile: str): 
   '''Return base pairs indexable by position, not taking into account chromosomes - Jonas'''
 
@@ -74,20 +74,26 @@ def readFASTA_by_genome(fastaFile: str):
       genome.append(seq)
 
   return genome
-
+"""
 def encodeWindows(gtfFile: str, sequence: str, window_sz: int, sig_str: int, sig_end: int):
   '''slides a window over a sequence of genes and checks whether there is a splice site or not. If so, returns a sequence of window size with label 1, else label 0 - Jonas'''
   ss_df = get_SS_data(gtf_to_dataframe(gtfFile))
-  embeddings = []
+  ss_array = ss_df.T.values
 
-  for i in range(len(sequence)):
+  embeddings = []
+  labels = []
+
+  for i in range(0,len(sequence),100):
     chunk = sequence[i:i+window_sz]
+
     #There IS a signal IF the signal start is an element of the ss_df[0] OR if sig_end is an element of the ss_df[1]
-    if ((ss_df[0] in (i + sig_end)) or (ss_df[1] in (i + sig_str))):
-      embeddings.append([chunk, 1])
+    if (((i + sig_end) in ss_array[0]) or ((i + sig_str) in ss_array[1])):
+      labels.append([1,0])
     else: 
-      embeddings.append([chunk, 0])
+      labels.append([0,1])
+
+    embeddings.append(chunk)
 
   #embeddings is an array of window size and the corresponding label (either SS or not)
-  return embeddings
+  return embeddings, labels 
 

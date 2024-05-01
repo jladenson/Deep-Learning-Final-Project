@@ -242,33 +242,36 @@ def main(train_donor=False, train_acceptor=False):
     if train_donor and train_acceptor:
         raise ValueError('Cannot train both donor and acceptor models simultaneously')
 
-    # generate random data for now
-    data = rng.choice(['A', 'C', 'G', 'T'], (100, 602))
-    # data = TextToList('data/___.fa')
+    gtfFile = 'c_elegans_genome/ncbi_dataset/data/GCA_000002985.3/genomic.gtf'
+    fastaFile = 'c_elegans_genome/ncbi_dataset/data/GCA_000002985.3/GCA_000002985.3_WBcel235_genomic.fna'
 
-    data = RemoveNonAGCT(data)
+
+    chromosome = preprocess.readFASTA_by_chromosome(fastaFile)
+    embeddings, labels = preprocess.encodeWindows(gtfFile, chromosome[0], 602, 300, 302)
+
+    #data = RemoveNonAGCT(data)
 
     begin = 0
     end = 602
     sig_str = 300
     sig_end = 302
-    data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
 
-    # generate random labels for now
-    labels = tf.constant([rng.choice([[0, 1], [1, 0]]) for _ in data])
+
+
+    data_up, data_down = split_up_down(embeddings, sig_str, sig_end, begin, end)
 
     # Train the donor models
     if train_donor:
-        don_acc = train_donor_models(data, data_up, data_down, labels)
+        don_acc = train_donor_models(embeddings, data_up, data_down, labels)
     else:
-        don_acc = load_donor_models(data, data_up, data_down, labels)
+        don_acc = load_donor_models(embeddings, data_up, data_down, labels)
     print(f'donor accuracy: {don_acc}')
 
     # Train the acceptor models
     if train_acceptor:
-        acc_acc = train_acceptor_models(data, data_up, data_down, labels)
+        acc_acc = train_acceptor_models(embeddings, data_up, data_down, labels)
     else:
-        acc_acc = load_acceptor_models(data, data_up, data_down, labels)
+        acc_acc = load_acceptor_models(embeddings, data_up, data_down, labels)
     print(f'acceptor accuracy: {acc_acc}')
 
     return
