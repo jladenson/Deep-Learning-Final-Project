@@ -38,3 +38,5 @@ pipenv.lock
 
 # ignore model files
 models/
+# ignore data files
+data/
