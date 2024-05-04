@@ -2,6 +2,7 @@ import tensorflow as tf
 from models import Conv, MLP
 from preprocess import *
 import argparse
+from random import sample
 
 ############################################################################################################
 # training models                                                                                          #
@@ -115,7 +116,7 @@ def main(train_donor=False, train_acceptor=False):
     fasta_file = 'data/GCA_000002985.3_WBcel235_genomic.fna'
 
     chromosomes = readFASTA_by_chromosome(fasta_file)
-    chromosome = chromosomes[0][0:100000]
+    chromosome = sample(chromosomes[0], 100000)
     ss_df = get_SS_data(gtf_file)
     acc_df, don_df = ss_df['start'], ss_df['end']
 
