@@ -78,7 +78,7 @@ def main(eval_donor=False, eval_acceptor=False):
     fasta_file = 'data/GCA_000002985.3_WBcel235_genomic.fna'
 
     chromosomes = readFASTA_by_chromosome(fasta_file)
-    chromosome = chromosomes[0][0:10000]
+    chromosome = chromosomes[0][100000:200000]
     ss_df = get_SS_data(gtf_file)
     acc_df, don_df = ss_df['start'], ss_df['end']
 

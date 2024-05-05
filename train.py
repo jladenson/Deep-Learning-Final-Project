@@ -2,7 +2,7 @@ import tensorflow as tf
 from models import Conv, MLP
 from preprocess import *
 import argparse
-from random import sample
+import os
 
 ############################################################################################################
 # training models                                                                                          #
@@ -14,7 +14,8 @@ def train_trinucleotide_model(data_64d, labels):
     conv.fit(data_64d,
              labels,
              epochs=10,
-             batch_size=64)
+             batch_size=64,
+             validation_split=0.2)
     return conv
 
 def train_single_nucleotide_model(data_4d, labels):
@@ -23,7 +24,8 @@ def train_single_nucleotide_model(data_4d, labels):
     conv.fit(data_4d,
              labels,
              epochs=10,
-             batch_size=64)
+             batch_size=64,
+             validation_split=0.2)
     return conv
 
 def train_donor_models(data, data_up, data_down, labels):
@@ -58,7 +60,8 @@ def train_donor_models(data, data_up, data_down, labels):
     final_model.fit(combined_data,
                     labels,
                     epochs=10,
-                    batch_size=64)
+                    batch_size=64,
+                    validation_split=0.2)
     final_model.save('models/donor/donor_final.keras')
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
@@ -95,7 +98,8 @@ def train_acceptor_models(data, data_up, data_down, labels):
     final_model.fit(combined_data,
                     labels,
                     epochs=10,
-                    batch_size=64)
+                    batch_size=64,
+                    validation_split=0.2)
     final_model.save('models/acceptor/acceptor_final.keras')
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
@@ -112,32 +116,41 @@ def main(train_donor=False, train_acceptor=False):
     if train_donor and train_acceptor:
         raise ValueError('Cannot train both donor and acceptor models simultaneously')
 
-    gtf_file = 'data/genomic.gtf'
-    fasta_file = 'data/GCA_000002985.3_WBcel235_genomic.fna'
-
-    chromosomes = readFASTA_by_chromosome(fasta_file)
-    chromosome = sample(chromosomes[0], 100000)
-    ss_df = get_SS_data(gtf_file)
-    acc_df, don_df = ss_df['start'], ss_df['end']
-
     begin = 0
     end = 602
     sig_str = 300
     sig_end = 302
 
-    # Train the donor models
-    if train_donor:
-        data, labels = encodeWindows(don_df, chromosome, end, sig_str, sig_end)
-        data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
-        don_acc = train_donor_models(data, data_up, data_down, labels)
-        print(f'donor accuracy: {don_acc}')
+    file_dir = 'data/'
+    data_files = os.listdir(file_dir)
+    fasta_files = [file_dir + f for f in data_files if f.endswith('.fna') or f.endswith('.fa')]
+    gtf_files = [file_dir + f for f in data_files if f.endswith('.gtf') or f.endswith('.gff3')]
+    fasta_files.sort()
+    gtf_files.sort()
 
-    # Train the acceptor models
+    # gtf_files = [file_dir + 'c_elegans.gtf']
+    # fasta_files = [file_dir + 'c_elegans.fna']
+
+    assert(fasta.endswith(gtf.split('.')[0].split('/'[-1])) for fasta, gtf in zip(fasta_files, gtf_files))
+    print(fasta_files)
+
+    data = []
+    labels = []
+    for fasta_file, gtf_file in zip(fasta_files, gtf_files):
+        chromosome = readFASTA_by_chromosome(fasta_file)[:100000]
+        boundary = 'start' if train_acceptor else 'end'
+        ss_df = get_SS_data(gtf_file, boundary)
+        org_data, org_labels = encodeWindows(ss_df, chromosome, end, sig_str, sig_end)
+        data += org_data
+        labels += org_labels
+    data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
+    labels = tf.convert_to_tensor(labels)
+
     if train_acceptor:
-        data, labels = encodeWindows(acc_df, chromosome, end, sig_str, sig_end)
-        data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
-        acc_acc = train_acceptor_models(data, data_up, data_down, labels)
-        print(f'acceptor accuracy: {acc_acc}')
+        acc = train_acceptor_models(data, data_up, data_down, labels)
+    elif train_donor:
+        acc = train_donor_models(data, data_up, data_down, labels)
+    print(f'train accuracy: {acc}')
 
     return
 

@@ -113,7 +113,7 @@ def gtf_to_dataframe(gtf_file: str):
     df = pd.DataFrame(gtf_data)
     return df
 
-def get_SS_data(gtf_file: str):
+def get_SS_data(gtf_file: str, boundary: str):
     ''' Takes in a pandas dataFrame of the GTF file and returns a sorted list
     of the start and stop indices (in the FASTA file) for exons '''
     df = gtf_to_dataframe(gtf_file)
@@ -122,7 +122,7 @@ def get_SS_data(gtf_file: str):
     end_df = exon_df['end']
     ss_df = pd.concat([start_df, end_df], axis=1)
     ss_df = ss_df.sort_values(by=['start'], ascending=True)
-    return ss_df
+    return ss_df[boundary]
 
 def readFASTA_by_chromosome(fastaFile: str):
     ''' Return a 2D array of base pairs indexable by chromosome and then position within chromosome by
@@ -131,7 +131,8 @@ def readFASTA_by_chromosome(fastaFile: str):
     with open(fastaFile) as file:
         for chromosome in SeqIO.parse(file, 'fasta'):
             seq = list(str(chromosome.seq).upper())
-            genome.append(seq)
+            genome = seq
+            break # only get one chromosome
 
     return genome
 
@@ -168,4 +169,4 @@ def encodeWindows(ss_df: pd.DataFrame, sequence: str, window_sz: int, sig_str: i
             labels.append([0,1])
 
     #embeddings is an array of window size and the corresponding label (either SS or not)
-    return embeddings, tf.constant(labels)
+    return embeddings, labels
