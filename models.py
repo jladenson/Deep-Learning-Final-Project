@@ -47,3 +47,14 @@ class MLP(Model):
 
     def call(self, x):
         return self.mlp(x)
+    
+class Simple(Model):
+    def __init__(self):
+        super(Simple, self).__init__()
+        self.simple = Sequential([
+            layers.Conv1D(32, 3, activation='relu', name=f'conv1d_1'),
+            layers.Dense(2, activation='softmax')
+        ])
+
+    def call(self, x):
+        return self.simple(x)

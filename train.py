@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models import Conv, MLP
+from models import Conv, MLP, Simple
 from preprocess import *
 import argparse
 import os
@@ -104,11 +104,30 @@ def train_acceptor_models(data, data_up, data_down, labels):
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
 
+def train_simple_models(data, labels):
+    data_4d = EncodeSeqToMono_4D(data)
+    
+    model = Simple()
+    model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.fit(data_4d,
+             labels,
+             epochs=10,
+             batch_size=64,
+             validation_split=0.2)
+    
+    model.save('models/simple/simple.keras')
+    preds = model.predict(data_4d)
+    
+    loss, acc = model.evaluate(preds, labels)
+    
+    return acc
+    
+
 ############################################################################################################
 # main                                                                                                     #
 ############################################################################################################
 
-def main(train_donor=False, train_acceptor=False):
+def main(train_donor=False, train_acceptor=False, train_simple=False):
     ''' This script trains the Deep Splice models
         given a DNA sequnce with length 602 and Splice
         site in 300-301 positions :...300N...SS... 300N... '''
@@ -150,6 +169,8 @@ def main(train_donor=False, train_acceptor=False):
         acc = train_acceptor_models(data, data_up, data_down, labels)
     elif train_donor:
         acc = train_donor_models(data, data_up, data_down, labels)
+    elif train_simple: 
+         acc = train_simple_models(data, labels)
     print(f'train accuracy: {acc}')
 
     return
@@ -158,5 +179,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_donor", action="store_true", help="Train donor models")
     parser.add_argument("--train_acceptor", action="store_true", help="Train acceptor models")
+    parser.add_argument("--train_simple", action="store_true", help="Train simple models")
     args = parser.parse_args()
-    main(args.train_donor, args.train_acceptor)
+    main(args.train_donor, args.train_acceptor, args.train_simple)
