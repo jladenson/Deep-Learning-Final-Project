@@ -1,5 +1,6 @@
 import tensorflow as tf
 from models import Conv, MLP, Simple
+from keras import layers
 from preprocess import *
 import argparse
 import os
@@ -105,20 +106,20 @@ def train_acceptor_models(data, data_up, data_down, labels):
     return acc
 
 def train_simple_models(data, labels):
-    data_4d = EncodeSeqToMono_4D(data)
+    data = EncodeOneHot(data)
     
     model = Simple()
     model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
-    model.fit(data_4d,
+    model.fit(data,
              labels,
              epochs=10,
              batch_size=64,
              validation_split=0.2)
     
-    model.save('models/simple/simple.keras')
-    preds = model.predict(data_4d)
+    model.save_weights('models/simple/simple', save_format="tf")
+    # preds = model.predict(data)
     
-    loss, acc = model.evaluate(preds, labels)
+    loss, acc = model.evaluate(data, labels)
     
     return acc
     
@@ -170,7 +171,7 @@ def main(train_donor=False, train_acceptor=False, train_simple=False):
     elif train_donor:
         acc = train_donor_models(data, data_up, data_down, labels)
     elif train_simple: 
-         acc = train_simple_models(data, labels)
+        acc = train_simple_models(data, labels)
     print(f'train accuracy: {acc}')
 
     return

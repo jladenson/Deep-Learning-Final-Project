@@ -30,6 +30,19 @@ def split_up_down(dna_list, sig_str, sig_end, begin, end):
 
     return up, down
 
+def EncodeOneHot(dna_list):
+    ''' Encode a list of DNA sequences to a list of 4xLx1 "images" '''
+    seq = dna_list[0]
+    n = len(seq)
+    bases = 'ACGT'
+    base_to_ind = {b: i for i, b in enumerate(bases)}
+    data = np.zeros((len(dna_list), 4, n))
+    for i, seq in enumerate(dna_list):
+        for j, base in enumerate(seq):
+            data[i][base_to_ind[base]][j] += 1
+
+    return data
+
 def EncodeSeqToMono_4D(dna_list):
     ''' Encode a list of DNA sequences to a list of 4xLx1 "images" '''
     seq = dna_list[0]
