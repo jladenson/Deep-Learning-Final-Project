@@ -31,7 +31,7 @@ def load_donor_models(data, data_up, data_down, labels):
                                down_preds),
                                axis=1)
 
-    loss, acc = final_model.evaluate(combined_data, labels)
+    _, acc, _, _ = final_model.evaluate(combined_data, labels)
     return acc
 
 def load_acceptor_models(data, data_up, data_down, labels):
@@ -58,7 +58,7 @@ def load_acceptor_models(data, data_up, data_down, labels):
                             down_preds),
                             axis=1)
 
-    loss, acc = final_model.evaluate(combined_data, labels)
+    _, acc, _, _ = final_model.evaluate(combined_data, labels)
     return acc
 
 

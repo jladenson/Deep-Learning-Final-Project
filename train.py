@@ -65,7 +65,7 @@ def train_donor_models(data, data_up, data_down, labels):
                     batch_size=64,
                     validation_split=0.1)
     final_model.save('models/donor/donor_final.keras')
-    loss, acc = final_model.evaluate(combined_data, labels)
+    _, acc, _, _ = final_model.evaluate(combined_data, labels)
     return acc
 
 def train_acceptor_models(data, data_up, data_down, labels):
@@ -105,7 +105,7 @@ def train_acceptor_models(data, data_up, data_down, labels):
                     batch_size=64,
                     validation_split=0.1)
     final_model.save('models/acceptor/acceptor_final.keras')
-    loss, acc = final_model.evaluate(combined_data, labels)
+    _, acc, _, _ = final_model.evaluate(combined_data, labels)
     return acc
 
 ############################################################################################################
