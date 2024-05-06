@@ -42,7 +42,7 @@ def EncodeSeqToMono_4D(dna_list):
     data = np.zeros((len(dna_list), 4, n), dtype=np.uint8)
     for i, seq in enumerate(dna_list):
         indices = [base_to_ind[base] for base in seq]
-        data[i, indices, :] = 1
+        data[i, indices, np.arange(n)] = 1
     return tf.expand_dims(tf.convert_to_tensor(data, dtype=tf.float32), axis=3)
 
 def EncodeSeqToTri_64D(dna_list):
@@ -54,7 +54,7 @@ def EncodeSeqToTri_64D(dna_list):
     data = np.zeros((len(dna_list), 64, n - 2), dtype=np.uint8)
     for i, seq in enumerate(dna_list):
         indices = [tris_to_ind[''.join(seq[j:j+3])] for j in range(n - 2)]
-        data[i, indices, :] = 1
+        data[i, indices, np.arange(n - 2)] = 1
     return tf.expand_dims(tf.convert_to_tensor(data, dtype=tf.float32), axis=3)
 
 ############################################################################################################

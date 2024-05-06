@@ -82,7 +82,7 @@ def main(eval_donor=False, eval_acceptor=False):
     data_dir = 'data/'
     fasta_file = data_dir + 'C. Elegans/c_elegans_genome.fa'
     gtf_file = data_dir + 'C. Elegans/c_elegans_genome.gtf'
-    chromosome = readFASTA_by_chromosome(fasta_file)
+    chromosome = readFASTA_by_chromosome(fasta_file)[500000:600000]
     boundary = 'start' if eval_acceptor else 'end'
     ss_df = get_SS_data(gtf_file, boundary)
     data, labels = encodeWindows(ss_df, chromosome, end - begin, sig_str, sig_end)

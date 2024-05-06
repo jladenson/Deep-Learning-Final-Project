@@ -1,4 +1,5 @@
 import tensorflow as tf
+from keras.metrics import Precision, Recall
 from models import Conv, MLP
 from preprocess import *
 import argparse
@@ -55,7 +56,9 @@ def train_donor_models(data, data_up, data_down, labels):
                                down_preds),
                                axis=1)
     final_model = MLP()
-    final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    final_model.compile(optimizer='adam',
+                        loss='binary_crossentropy',
+                        metrics=['accuracy', Precision(), Recall()])
     final_model.fit(combined_data,
                     labels,
                     epochs=10,
@@ -93,7 +96,9 @@ def train_acceptor_models(data, data_up, data_down, labels):
                                down_preds),
                                axis=1)
     final_model = MLP()
-    final_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    final_model.compile(optimizer='adam',
+                        loss='binary_crossentropy',
+                        metrics=['accuracy', Precision(), Recall()])
     final_model.fit(combined_data,
                     labels,
                     epochs=10,
@@ -124,9 +129,8 @@ def main(train_donor=False, train_acceptor=False):
     fasta_file = data_dir + 'C. Elegans/c_elegans_genome.fa'
     gtf_file = data_dir + 'C. Elegans/c_elegans_genome.gtf'
 
-    chromosome = readFASTA_by_chromosome(fasta_file)
-    boundary = 'start' if train_acceptor else 'end'
-    ss_df = get_SS_data(gtf_file, boundary)
+    chromosome = readFASTA_by_chromosome(fasta_file)[:500000]
+    ss_df = get_SS_data(gtf_file, 'start' if train_acceptor else 'end')
 
     data, labels = encodeWindows(ss_df, chromosome, end - begin, sig_str, sig_end)
     data, labels = RemoveNonAGCT(data, labels)
