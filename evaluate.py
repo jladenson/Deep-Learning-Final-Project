@@ -113,7 +113,7 @@ def main(eval_donor=False, eval_acceptor=False, eval_simple=False):
         
     if eval_simple:
         data, labels = encodeWindows(???, chromosome, end, sig_str, sig_end)
-        sim_acc = load_acceptor_models(data, labels)
+        sim_acc = load_simple_models(data, labels)
         print(f'simple accuracy: {sim_acc}')
 
     return
