@@ -126,7 +126,7 @@ def gtf_to_dataframe(gtf_file: str):
     df = pd.DataFrame(gtf_data)
     return df
 
-def get_SS_data(gtf_file: str, boundary: str):
+def get_SS_data(gtf_file: str):
     ''' Takes in a pandas dataFrame of the GTF file and returns a sorted list
     of the start and stop indices (in the FASTA file) for exons '''
     df = gtf_to_dataframe(gtf_file)
@@ -135,7 +135,7 @@ def get_SS_data(gtf_file: str, boundary: str):
     end_df = exon_df['end']
     ss_df = pd.concat([start_df, end_df], axis=1)
     ss_df = ss_df.sort_values(by=['start'], ascending=True)
-    return ss_df[boundary]
+    return ss_df
 
 def readFASTA_by_chromosome(fastaFile: str):
     ''' Return a 2D array of base pairs indexable by chromosome and then position within chromosome by

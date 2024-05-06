@@ -52,9 +52,9 @@ class Simple(Model):
     def __init__(self):
         super(Simple, self).__init__()
         self.simple = Sequential([
-            layers.Conv1D(32, 3, activation='relu', kernel_initializer='glorot_uniform', name=f'conv1d_1'),
+            layers.Conv1D(32, 3, activation='relu', name=f'conv1d_1'),
             layers.Dense(50, activation='relu'),
-            layers.Dense(1, activation='softmax')
+            layers.Dense(1, activation='sigmoid')
         ])
 
     def call(self, x):

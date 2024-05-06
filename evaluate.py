@@ -2,6 +2,7 @@ import tensorflow as tf
 from keras.models import load_model
 from preprocess import *
 import argparse
+from models import *
 
 ############################################################################################################
 # loading models                                                                                           #
@@ -61,12 +62,21 @@ def load_acceptor_models(data, data_up, data_down, labels):
     loss, acc = final_model.evaluate(combined_data, labels)
     return acc
 
+def load_simple_models(data, labels):  
+    model = Simple()
+    model.load_weights('models/simple/simple')
+
+    data = EncodeOneHot(data)
+
+    loss, acc = model.evaluate(data, labels)
+    return acc
+
 
 ############################################################################################################
 # main                                                                                                     #
 ############################################################################################################
 
-def main(eval_donor=False, eval_acceptor=False):
+def main(eval_donor=False, eval_acceptor=False, eval_simple=False):
     ''' This script evaluates the Deep Splice models
         given a DNA sequnce with length 602 and Splice
         site in 300-301 positions :...300N...SS... 300N... '''
@@ -100,6 +110,11 @@ def main(eval_donor=False, eval_acceptor=False):
         data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
         acc_acc = load_acceptor_models(data, data_up, data_down, labels)
         print(f'acceptor accuracy: {acc_acc}')
+        
+    if eval_simple:
+        data, labels = encodeWindows(???, chromosome, end, sig_str, sig_end)
+        sim_acc = load_acceptor_models(data, labels)
+        print(f'simple accuracy: {sim_acc}')
 
     return
 
@@ -107,5 +122,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--eval_donor", action="store_true", help="Evaluate donor models")
     parser.add_argument("--eval_acceptor", action="store_true", help="Evaluate acceptor models")
+    parser.add_argument("--eval_simple", action="store_true", help="Evaluate simple models")
     args = parser.parse_args()
-    main(args.eval_donor, args.eval_acceptor)
+    main(args.eval_donor, args.eval_acceptor, args.eval_simple)
