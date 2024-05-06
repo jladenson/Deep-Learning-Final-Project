@@ -8,16 +8,19 @@ from itertools import product
 # processing and embedding data                                                                            #
 ############################################################################################################
 
-def TextToList(fileName):
-    ''' Read fasta file and return its sequences as a list '''
-    dna_list = []
-    with open(fileName) as file:
-        for line in file:
-            li = line.strip()
-            if not li.startswith(">"):
-                dna_list.append(line.rstrip("\n"))
-    file.close()
-    return dna_list
+def RemoveNonAGCT(dna_list, labels):
+    ''' Remove sequences that contain characters other than ACGT '''
+    chars = set('ACGT')
+    dna_listACGT = []
+    labelsACGT = []
+    for s, label in zip(dna_list, labels):
+        if all(c in chars for c in s):
+            dna_listACGT.append(s)
+            labelsACGT.append(label)
+        else:
+            print('Some sequence excluded, contained characters other than ACGT')
+
+    return dna_listACGT, labelsACGT
 
 def split_up_down(dna_list, sig_str, sig_end, begin, end):
     ''' Split regions around SS to Up stream and Down stream '''
@@ -36,15 +39,11 @@ def EncodeSeqToMono_4D(dna_list):
     n = len(seq)
     bases = 'ACGT'
     base_to_ind = {b: i for i, b in enumerate(bases)}
-    data = []
-    for seq in dna_list:
-        image = np.zeros((4, n))
-        for i, base in enumerate(seq):
-            image[base_to_ind[base]][i] +=1
-
-        data.append(image)
-
-    return tf.expand_dims(tf.constant(data), axis=3)
+    data = np.zeros((len(dna_list), 4, n), dtype=np.uint8)
+    for i, seq in enumerate(dna_list):
+        indices = [base_to_ind[base] for base in seq]
+        data[i, indices, :] = 1
+    return tf.expand_dims(tf.convert_to_tensor(data, dtype=tf.float32), axis=3)
 
 def EncodeSeqToTri_64D(dna_list):
     ''' Encode a list of DNA sequences to a list of 64xLx1 "images" '''
@@ -52,25 +51,11 @@ def EncodeSeqToTri_64D(dna_list):
     n = len(seq)
     tris = list(map(''.join, product('ACGT', repeat=3)))
     tris_to_ind = {tri: i for i, tri in enumerate(tris)}
-    data = []
-    for seq in dna_list:
-        image = np.zeros((64, n))
-        for i in range(len(seq) - 2):
-            tri = ''.join(seq[i:i+3])
-            image[tris_to_ind[tri]][i] += 1
-
-        data.append(image)
-
-    return tf.expand_dims(tf.constant(data), axis=3)
-
-def RemoveNonAGCT(dna_list):
-    ''' Remove sequences that contain characters other than ACGT '''
-    chars = set('ACGT')
-    dna_listACGT = [s for s in dna_list if all(c in chars for c in s)]
-    if len(dna_listACGT) < len(dna_list):
-            print('Some sequence excluded, contained characters other than ACGT')
-
-    return dna_listACGT
+    data = np.zeros((len(dna_list), 64, n - 2), dtype=np.uint8)
+    for i, seq in enumerate(dna_list):
+        indices = [tris_to_ind[''.join(seq[j:j+3])] for j in range(n - 2)]
+        data[i, indices, :] = 1
+    return tf.expand_dims(tf.convert_to_tensor(data, dtype=tf.float32), axis=3)
 
 ############################################################################################################
 # reading genome from file                                                                                 #
@@ -82,15 +67,6 @@ def parseGTF(gtfFile: str):
         if line.startswith("#"):
             continue
         fields = line.strip().split("\t")
-        attributes = {}
-        for attribute in fields[8].split(";"):
-            if attribute.strip():
-                try:
-                    key, value = attribute.strip().split(" ", 1)
-                    attributes[key] = value.strip('"')
-                except ValueError:
-                    key = attribute.strip()
-                    attributes[key] = None
         yield {
             "seqname": fields[0],
             "source": fields[1],
@@ -99,8 +75,7 @@ def parseGTF(gtfFile: str):
             "end": int(fields[4]),
             "score": fields[5],
             "strand": fields[6],
-            "frame": fields[7],
-            **attributes
+            "frame": fields[7]
         }
 
 def gtf_to_dataframe(gtf_file: str):
@@ -136,37 +111,31 @@ def readFASTA_by_chromosome(fastaFile: str):
 
     return genome
 
-def encodePositives(ss_df: pd.DataFrame, sequence: str, window_sz: int, sig_str: int, sig_end: int):
-    ''' extracts all positive exmaples from the sequence and returns them as a list of embeddings '''
-    pos_embeddings = []
-    length = len(sequence)
-
-    ss_df = ss_df[ss_df <= length]
-
-    for pos in ss_df:
-        window_start = max(pos - sig_str, 0)
-        window_end = min(pos + sig_end, length)
-        chunk = sequence[window_start:window_end]
-        if len(chunk) == window_sz:
-          pos_embeddings.append(chunk)
-
-    return pos_embeddings, [[1,0]] * len(pos_embeddings)
-
-def encodeWindows(ss_df: pd.DataFrame, sequence: str, window_sz: int, sig_str: int, sig_end: int) -> tuple[list, tf.Tensor]:
+def encodeWindows(ss_df: pd.DataFrame, sequence: list[str], window_sz: int, sig_str: int, sig_end: int) -> tuple[list, tf.Tensor]:
     ''' slides a window over a sequence of genes and checks whether there is a splice site or not.
         If so, returns a sequence of window size with label 1, else label 0 '''
 
-    embeddings, labels = encodePositives(ss_df, sequence, window_sz, sig_str, sig_end)
+    # filter out any indices that are out of bounds
+    len_seq = len(sequence)
+    ss_df = ss_df[(ss_df > sig_str) & (ss_df < len_seq - sig_end)]
 
-    sig = sig_str if ss_df.name == 'start' else sig_end
-    # get ~ as many negative as positive
-    step = len(sequence) // len(embeddings)
-    for i in range(0, len(sequence), step):
-    #There IS a signal IF the signal start is an element of the ss_df[0] OR if sig_end is an element of the ss_df[1]
-        if not (i + sig) in ss_df:
-            chunk = sequence[i:i+window_sz]
-            embeddings.append(chunk)
-            labels.append([0,1])
+    pos_embeddings = [sequence[pos-sig_str:pos+sig_end] for pos in ss_df]
+    pos_labels = [[1, 0]] * len(pos_embeddings)
 
-    #embeddings is an array of window size and the corresponding label (either SS or not)
-    return embeddings, labels
+    # Create a mask for if window has splice site near center
+    mask = np.zeros(len_seq, dtype=bool)
+    for pos in ss_df:
+        mask[pos-sig_str//2:pos+sig_end//2] = True
+    # Find valid indices where the mask is False and randomly select from them
+    neg_inds = np.where(~mask)[0]
+    neg_inds = neg_inds[(neg_inds > sig_str) & (neg_inds < len_seq - sig_end)]
+    # get as many negative as positive
+    n_emb = len(pos_embeddings)
+    neg_starts = np.random.choice(neg_inds, size=n_emb, replace=False)
+    neg_embeddings = [sequence[start-sig_str:start+sig_end] for start in neg_starts]
+    neg_labels = [[0, 1]] * len(neg_embeddings)
+
+    pos_embeddings.extend(neg_embeddings)
+    pos_labels.extend(neg_labels)
+
+    return pos_embeddings, pos_labels

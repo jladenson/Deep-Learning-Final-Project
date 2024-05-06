@@ -19,7 +19,7 @@ class Conv(Model):
         self.flatten_layer = layers.Flatten(name='flatten')
 
         # Define final dropout layer
-        self.dense = layers.Dense(500, activation='relu', name='dense')
+        self.dense = layers.Dense(512, activation='relu', name='dense')
 
         # Define output layer
         self.output_layer = layers.Dense(2, activation='softmax', name='output')

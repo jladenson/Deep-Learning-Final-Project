@@ -74,32 +74,27 @@ def main(eval_donor=False, eval_acceptor=False):
     if eval_donor and eval_acceptor:
         raise ValueError('Cannot evaluate both donor and acceptor models simultaneously')
 
-    gtf_file = 'data/genomic.gtf'
-    fasta_file = 'data/GCA_000002985.3_WBcel235_genomic.fna'
-
-    chromosomes = readFASTA_by_chromosome(fasta_file)
-    chromosome = chromosomes[0][100000:200000]
-    ss_df = get_SS_data(gtf_file)
-    acc_df, don_df = ss_df['start'], ss_df['end']
-
     begin = 0
     end = 602
     sig_str = 300
     sig_end = 302
 
-    # evaluate the donor models
-    if eval_donor:
-        data, labels = encodeWindows(don_df, chromosome, end, sig_str, sig_end)
-        data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
-        don_acc = load_donor_models(data, data_up, data_down, labels)
-        print(f'donor accuracy: {don_acc}')
+    data_dir = 'data/'
+    fasta_file = data_dir + 'C. Elegans/c_elegans_genome.fa'
+    gtf_file = data_dir + 'C. Elegans/c_elegans_genome.gtf'
+    chromosome = readFASTA_by_chromosome(fasta_file)
+    boundary = 'start' if eval_acceptor else 'end'
+    ss_df = get_SS_data(gtf_file, boundary)
+    data, labels = encodeWindows(ss_df, chromosome, end - begin, sig_str, sig_end)
+    data, labels = RemoveNonAGCT(data, labels)
+    data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
+    labels = tf.convert_to_tensor(labels)
 
-    # evaluate the acceptor models
     if eval_acceptor:
-        data, labels = encodeWindows(acc_df, chromosome, end, sig_str, sig_end)
-        data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
-        acc_acc = load_acceptor_models(data, data_up, data_down, labels)
-        print(f'acceptor accuracy: {acc_acc}')
+        acc = load_acceptor_models(data, data_up, data_down, labels)
+    elif eval_donor:
+        acc = load_donor_models(data, data_up, data_down, labels)
+    print(f'train accuracy: {acc}')
 
     return
 
