@@ -13,8 +13,8 @@ def train_trinucleotide_model(data_64d, labels):
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_64d,
              labels,
-             epochs=10,
-             batch_size=64,
+             epochs=5,
+             batch_size=128,
              validation_split=0.1)
     return conv
 
@@ -23,8 +23,8 @@ def train_single_nucleotide_model(data_4d, labels):
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_4d,
              labels,
-             epochs=10,
-             batch_size=64,
+             epochs=5,
+             batch_size=128,
              validation_split=0.1)
     return conv
 
@@ -61,12 +61,11 @@ def train_donor_models(data, data_up, data_down, labels):
                         metrics=['accuracy', Precision(), Recall()])
     final_model.fit(combined_data,
                     labels,
-                    epochs=10,
-                    batch_size=64,
+                    epochs=5,
+                    batch_size=128,
                     validation_split=0.1)
     final_model.save('models/donor/donor_final.keras')
-    _, acc, _, _ = final_model.evaluate(combined_data, labels)
-    return acc
+    final_model.evaluate(combined_data, labels)
 
 def train_acceptor_models(data, data_up, data_down, labels):
     ''' upstream: single nucleuotide
@@ -101,12 +100,11 @@ def train_acceptor_models(data, data_up, data_down, labels):
                         metrics=['accuracy', Precision(), Recall()])
     final_model.fit(combined_data,
                     labels,
-                    epochs=10,
-                    batch_size=64,
+                    epochs=5,
+                    batch_size=128,
                     validation_split=0.1)
     final_model.save('models/acceptor/acceptor_final.keras')
-    _, acc, _, _ = final_model.evaluate(combined_data, labels)
-    return acc
+    final_model.evaluate(combined_data, labels)
 
 ############################################################################################################
 # main                                                                                                     #
@@ -120,14 +118,22 @@ def main(train_donor=False, train_acceptor=False):
     if train_donor and train_acceptor:
         raise ValueError('Cannot train both donor and acceptor models simultaneously')
 
+    '''
+
+    data, labels = get_np_array()
+
     begin = 0
     end = 602
     sig_str = 300
     sig_end = 302
 
     data_dir = 'data/'
-    fasta_file = data_dir + 'C. Elegans/c_elegans_genome.fa'
-    gtf_file = data_dir + 'C. Elegans/c_elegans_genome.gtf'
+    # fasta_file = data_dir + 'C. Elegans/c_elegans_genome.fa'
+    # gtf_file = data_dir + 'C. Elegans/c_elegans_genome.gtf'
+    # fasta_file = data_dir + 'Camel/camel_genome-004.fa'
+    # gtf_file = data_dir + 'Camel/camel_genome.gtf'
+    fasta_file = data_dir + 'Human/human_genome-002.fa'
+    gtf_file = data_dir + 'Human/Human_genome.gtf'
 
     chromosome = readFASTA_by_chromosome(fasta_file)[:500000]
     ss_df = get_SS_data(gtf_file, 'start' if train_acceptor else 'end')
@@ -135,13 +141,26 @@ def main(train_donor=False, train_acceptor=False):
     data, labels = encodeWindows(ss_df, chromosome, end - begin, sig_str, sig_end)
     data, labels = RemoveNonAGCT(data, labels)
     data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
-    labels = tf.convert_to_tensor(labels)
+    labels = tf.keras.utils.to_categorical(labels)
+
+    '''
+
+    begin = 0
+    end = 401
+    sig_str = 200
+    sig_end = 201
+
+    path = '../DeepSplicer/ensembl_seqs/homo_sapiens/'
+    data, labels = get_np_array(path, 'acceptor' if train_acceptor else 'donor')
+    print(data.shape, labels.shape)
+    data, labels = RemoveNonAGCT(data, labels)
+    data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
+    labels = tf.keras.utils.to_categorical(labels)
 
     if train_acceptor:
-        acc = train_acceptor_models(data, data_up, data_down, labels)
+        train_acceptor_models(data, data_up, data_down, labels)
     elif train_donor:
-        acc = train_donor_models(data, data_up, data_down, labels)
-    print(f'train accuracy: {acc}')
+        train_donor_models(data, data_up, data_down, labels)
 
     return
 
