@@ -99,19 +99,19 @@ def get_SS_data(gtf_file: str, boundary: str):
 
 def readFASTA_by_chromosome(fastaFile: str):
     ''' Return a 2D array of base pairs indexable by chromosome and then position within chromosome by
-        iterating through each and turning the sequence into a list of uppercase characters'''
+        iterating through each and turning the sequence into a list of uppercase characters
+        *** edited to only return the first chromosome '''
     genome = []
     with open(fastaFile) as file:
         for chromosome in SeqIO.parse(file, 'fasta'):
             seq = list(str(chromosome.seq).upper())
             genome.append(seq)
-            if len(genome) == 2:
-                break # only get two chromosomes
+            break
 
-    return genome
+    return seq
 
 def encodeWindows(ss_df: pd.DataFrame, sequence: list[str], window_sz: int, sig_str: int, sig_end: int):
-    ''' slides a window over a sequence of genes and checks whether there is a splice site or not.
+    ''' Slides a window over a sequence of genes and checks whether there is a splice site or not.
         If so, returns a sequence of window size with label 1, else label 0 '''
 
     # filter out any indices that are out of bounds
@@ -142,14 +142,15 @@ def encodeWindows(ss_df: pd.DataFrame, sequence: list[str], window_sz: int, sig_
     return pos_embeddings, pos_labels
 
 ############################################################################################################
-# DeepSplicer preprocessing                                                                                #
+# Altered DeepSplicer preprocessing                                                                        #
 ############################################################################################################
 
 def get_np_array(path, model_type):
-    """ Loads the genomic sequences from homo_sapiens directory as an array to train the model """
+    """ Loads the genomic sequences from homo_sapiens directory
+        as an array of base pairs and generates corresponding labels """
     arr_seqs = []
     y_arr = []
-    flanking_length = 200 # sig_str
+    flank_len = 200
     no_donor = 0
     no_acceptor = 0
     no_other = 0
@@ -157,7 +158,7 @@ def get_np_array(path, model_type):
         x_seqs = []
         y_seqs = []
         for i in range(0,19305,1000):
-            file_name = path + "{}_seqs_{}_{}_flank_{}.txt".format(type_seq,i,i+1000,flanking_length)
+            file_name = path + f"{type_seq}_seqs_{i}_{i+1000}_flank_{flank_len}.txt"
             file = open(file_name)
             for line in file:
                 if line.startswith(">>"):
@@ -173,7 +174,7 @@ def get_np_array(path, model_type):
                         y_seqs.append(0)
                         no_other += 1
         new_sample_size = 10000
-        x_seqs, y_seqs = resample(x_seqs, y_seqs, n_samples=new_sample_size, random_state=1)
+        x_seqs, y_seqs = resample(x_seqs, y_seqs, n_samples=new_sample_size)
         print("{}: x: {}, y: {}".format(type_seq, len(x_seqs),len(y_seqs)))
 
         arr_seqs.extend(x_seqs)
@@ -185,12 +186,13 @@ def get_np_array(path, model_type):
     return np_arr, np_y_arr
 
 def get_np_array_species(path, model_type, species_name):
-    """ Loads the genomic sequences from other_species directory as an array to test the model """
+    """ Loads the genomic sequences from other_species directory
+        as an array of base pairs and generates corresponding labels """
     arr_seqs = []
     y_arr = []
-    flanking_length = 200
+    flank_len = 200
     for type_seq in [model_type, "other"]:
-        file_name = path + "{}_{}_seqs_flank_{}.txt".format(species_name,type_seq,flanking_length)
+        file_name = path + f"{species_name}_{type_seq}_seqs_flank_{flank_len}.txt"
         file = open(file_name)
         for line in file:
             if line.startswith(">>"):

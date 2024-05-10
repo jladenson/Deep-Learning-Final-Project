@@ -8,6 +8,7 @@ import argparse
 ############################################################################################################
 
 def load_donor_models(data, data_up, data_down, labels):
+    ''' Load the donor models and evaluate them on the given data '''
     path = 'models/donor/donor_'
     models = ['srdng', 'up', 'down', 'final']
     if (not all(tf.io.gfile.exists(path + model + '.keras') for model in models)):
@@ -34,6 +35,7 @@ def load_donor_models(data, data_up, data_down, labels):
     final_model.evaluate(combined_data, labels)
 
 def load_acceptor_models(data, data_up, data_down, labels):
+    ''' Load the acceptor models and evaluate them on the given data '''
     path = 'models/acceptor/acceptor_'
     models = ['srdng', 'up', 'down', 'final']
     if (not all(tf.io.gfile.exists(path + model + '.keras') for model in models)):
@@ -65,13 +67,11 @@ def load_acceptor_models(data, data_up, data_down, labels):
 ############################################################################################################
 
 def main(eval_donor=False, eval_acceptor=False):
-    ''' This script evaluates the Deep Splice models
-        given a DNA sequnce with length 602 and Splice
-        site in 300-301 positions :...300N...SS... 300N... '''
 
     if eval_donor and eval_acceptor:
         raise ValueError('Cannot evaluate both donor and acceptor models simultaneously')
 
+    # commented below is the original code that uses our preprocessing on the raw genome data
     '''
 
     begin = 0

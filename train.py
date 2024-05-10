@@ -9,6 +9,7 @@ import argparse
 ############################################################################################################
 
 def train_trinucleotide_model(data_64d, labels):
+    ''' Trains a trinucleotide model with filter lengths ranging from 3 to 61 '''
     conv = Conv(embedding_dim=64, filter_lens=[3, 5, 10, 21, 31, 41, 50, 61])
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_64d,
@@ -19,6 +20,7 @@ def train_trinucleotide_model(data_64d, labels):
     return conv
 
 def train_single_nucleotide_model(data_4d, labels):
+    ''' Trains a single nucleotide model with filter lengths ranging from 1 to 10 '''
     conv = Conv(embedding_dim=4, filter_lens=list(range(1, 10)))
     conv.compile(optimizer='nadam', loss='binary_crossentropy', metrics=['accuracy'])
     conv.fit(data_4d,
@@ -29,8 +31,9 @@ def train_single_nucleotide_model(data_4d, labels):
     return conv
 
 def train_donor_models(data, data_up, data_down, labels):
-    ''' upstream: trinucleuotide
-    downstream: single nucleuotide '''
+    ''' Trains the constituents of the donor model.
+        upstream (exon): trinucleuotide
+        downstream (intron): single nucleuotide '''
     data_srdng_4d = EncodeSeqToMono_4D(data)
     data_up_64d = EncodeSeqToTri_64D(data_up)
     data_down_4d = EncodeSeqToMono_4D(data_down)
@@ -68,8 +71,9 @@ def train_donor_models(data, data_up, data_down, labels):
     final_model.evaluate(combined_data, labels)
 
 def train_acceptor_models(data, data_up, data_down, labels):
-    ''' upstream: single nucleuotide
-        downstream: trinucleuotide '''
+    ''' Train the constituents of the acceptor model.
+        upstream (intron): single nucleuotide
+        downstream (exon): trinucleuotide '''
     data_srdng_4d = EncodeSeqToMono_4D(data)
     data_up_4d = EncodeSeqToMono_4D(data_up)
     data_down_64d = EncodeSeqToTri_64D(data_down)
@@ -111,13 +115,11 @@ def train_acceptor_models(data, data_up, data_down, labels):
 ############################################################################################################
 
 def main(train_donor=False, train_acceptor=False):
-    ''' This script trains the Deep Splice models
-        given a DNA sequnce with length 602 and Splice
-        site in 300-301 positions :...300N...SS... 300N... '''
 
     if train_donor and train_acceptor:
         raise ValueError('Cannot train both donor and acceptor models simultaneously')
 
+    # Commented below is the original code that uses our preprocessing on the raw genome data
     '''
 
     data, labels = get_np_array()
@@ -152,7 +154,6 @@ def main(train_donor=False, train_acceptor=False):
 
     path = '../DeepSplicer/ensembl_seqs/homo_sapiens/'
     data, labels = get_np_array(path, 'acceptor' if train_acceptor else 'donor')
-    print(data.shape, labels.shape)
     data, labels = RemoveNonAGCT(data, labels)
     data_up, data_down = split_up_down(data, sig_str, sig_end, begin, end)
     labels = tf.keras.utils.to_categorical(labels)
